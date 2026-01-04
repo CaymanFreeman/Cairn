@@ -3,13 +3,14 @@ use crate::world::World;
 use log::error;
 use std::sync::Arc;
 use winit::application::ApplicationHandler;
-use winit::event::WindowEvent;
+use winit::event::{KeyEvent, WindowEvent};
 use winit::event_loop::ActiveEventLoop;
+use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::Window;
 
 pub struct App {
     renderer: Option<Renderer>,
-    world: World,
+    _world: World,
 }
 
 impl Default for App {
@@ -22,11 +23,15 @@ impl App {
     pub fn new() -> Self {
         Self {
             renderer: None,
-            world: World::new(),
+            _world: World::new(),
         }
     }
 
-    fn update(&self) {}
+    fn update(&mut self) {
+        if let Some(renderer) = &mut self.renderer {
+            renderer.update();
+        }
+    }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         if let Some(renderer) = &mut self.renderer {
@@ -49,9 +54,14 @@ impl ApplicationHandler for App {
         }
 
         let window_attributes = Window::default_attributes().with_title("Cairn");
-        let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
+        let window = Arc::new(
+            event_loop
+                .create_window(window_attributes)
+                .expect("Window should be created"),
+        );
 
-        self.renderer = Some(pollster::block_on(Renderer::new(window)).unwrap());
+        self.renderer =
+            Some(pollster::block_on(Renderer::new(window)).expect("Renderer should be created"));
     }
 
     fn window_event(
@@ -76,6 +86,23 @@ impl ApplicationHandler for App {
                     Err(error) => {
                         error!("Unable to render: {error}");
                     }
+                }
+            }
+            WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        physical_key: PhysicalKey::Code(code),
+                        state: key_state,
+                        ..
+                    },
+                ..
+            } => {
+                let is_pressed = key_state.is_pressed();
+                if code == KeyCode::Escape && is_pressed {
+                    event_loop.exit();
+                }
+                if let Some(renderer) = &mut self.renderer {
+                    renderer.camera_controller().handle_key(code, is_pressed);
                 }
             }
             _ => {}

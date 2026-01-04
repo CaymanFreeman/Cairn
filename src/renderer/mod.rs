@@ -2,8 +2,15 @@ mod camera;
 mod pipeline;
 mod texture;
 
+use crate::renderer::pipeline::create_camera_bind_group_layout;
+use crate::world::voxel::Voxel;
 use camera::{Camera, CameraController};
+use pipeline::{
+    create_index_buffer, create_render_pipeline, create_surface_config,
+    create_texture_bind_group_layout, create_vertex_buffer,
+};
 use std::sync::Arc;
+use texture::Texture;
 use winit::window::Window;
 
 pub(crate) struct Renderer {
@@ -11,14 +18,19 @@ pub(crate) struct Renderer {
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
-    config: wgpu::SurfaceConfiguration,
+    surface_config: wgpu::SurfaceConfiguration,
+    diffuse_texture: Texture,
+    depth_texture: Texture,
+    vertex_buffer: wgpu::Buffer,
+    index_buffer: wgpu::Buffer,
+    index_count: u32,
     camera: Camera,
     camera_controller: CameraController,
+    render_pipeline: wgpu::RenderPipeline,
 }
 
 impl Renderer {
     pub(crate) async fn new(window: Arc<Window>) -> anyhow::Result<Self> {
-        let size = window.inner_size();
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
             ..Default::default()
@@ -43,36 +55,50 @@ impl Renderer {
             })
             .await?;
 
-        let surface_caps = surface.get_capabilities(&adapter);
-        let surface_format = surface_caps
-            .formats
-            .iter()
-            .find(|texture_format| texture_format.is_srgb())
-            .copied()
-            .unwrap_or(surface_caps.formats[0]);
+        let surface_config = create_surface_config(window.inner_size(), &surface, &adapter);
 
-        let config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface_format,
-            width: size.width,
-            height: size.height,
-            present_mode: wgpu::PresentMode::AutoVsync,
-            alpha_mode: wgpu::CompositeAlphaMode::Auto,
-            view_formats: vec![],
-            desired_maximum_frame_latency: 2,
-        };
+        let texture_bind_group_layout = create_texture_bind_group_layout(&device);
 
-        let camera = Camera::new();
+        let diffuse_texture = Texture::diffuse_from_bytes(
+            &device,
+            &queue,
+            &texture_bind_group_layout,
+            include_bytes!("../../assets/tree.png"),
+            "tree.png",
+        )
+        .expect("Tree image should load");
+
+        let depth_texture = Texture::new_depth_texture(&device, &surface_config, "Depth Texture");
+
+        let camera_bind_group_layout = create_camera_bind_group_layout(&device);
+        let camera = Camera::new(&device, &surface_config, &camera_bind_group_layout);
         let camera_controller = CameraController::new();
+
+        let cube_mesh = Voxel::new([0, 0, 0]).generate_mesh();
+        let vertex_buffer = create_vertex_buffer(&device, cube_mesh.vertices());
+        let index_buffer = create_index_buffer(&device, cube_mesh.indices());
+        let index_count = cube_mesh.index_count();
+
+        let render_pipeline = create_render_pipeline(
+            &device,
+            &surface_config,
+            &[&texture_bind_group_layout, &camera_bind_group_layout],
+        );
 
         Ok(Self {
             window,
             surface,
             device,
             queue,
-            config,
+            surface_config,
+            diffuse_texture,
+            depth_texture,
+            vertex_buffer,
+            index_buffer,
+            index_count,
             camera,
             camera_controller,
+            render_pipeline,
         })
     }
 
@@ -80,11 +106,22 @@ impl Renderer {
         &self.window
     }
 
+    pub(crate) fn camera_controller(&mut self) -> &mut CameraController {
+        &mut self.camera_controller
+    }
+
+    pub(crate) fn update(&mut self) {
+        self.camera_controller.update_camera(&mut self.camera);
+        self.camera.update_buffer(&self.queue);
+    }
+
     pub(crate) fn resize(&mut self, width: u32, height: u32) {
         if width > 0 && height > 0 {
-            self.config.width = width;
-            self.config.height = height;
-            self.surface.configure(&self.device, &self.config);
+            self.surface_config.width = width;
+            self.surface_config.height = height;
+            self.surface.configure(&self.device, &self.surface_config);
+
+            self.camera.resize(width, height);
         }
     }
 
@@ -102,7 +139,7 @@ impl Renderer {
                 label: Some("Render Encoder"),
             });
 
-        let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Render Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: &view,
@@ -118,11 +155,24 @@ impl Renderer {
                     store: wgpu::StoreOp::Store,
                 },
             })],
-            depth_stencil_attachment: None,
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: &self.depth_texture.view(),
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
             occlusion_query_set: None,
             timestamp_writes: None,
             multiview_mask: None,
         });
+        render_pass.set_pipeline(&self.render_pipeline);
+        render_pass.set_bind_group(0, &self.diffuse_texture.bind_group(), &[]);
+        render_pass.set_bind_group(1, &self.camera.bind_group(), &[]);
+        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+        render_pass.draw_indexed(0..self.index_count, 0, 0..1);
         drop(render_pass);
 
         self.queue.submit(std::iter::once(encoder.finish()));

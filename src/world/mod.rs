@@ -1,5 +1,5 @@
 mod chunk;
-mod voxel;
+pub(crate) mod voxel;
 
 pub(crate) struct World {}
 
