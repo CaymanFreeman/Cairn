@@ -3,14 +3,15 @@ use crate::world::World;
 use log::error;
 use std::sync::Arc;
 use winit::application::ApplicationHandler;
-use winit::event::{KeyEvent, WindowEvent};
+use winit::event::{DeviceEvent, DeviceId, ElementState, KeyEvent, WindowEvent};
 use winit::event_loop::ActiveEventLoop;
 use winit::keyboard::{KeyCode, PhysicalKey};
-use winit::window::Window;
+use winit::window::{CursorGrabMode, Window};
 
 pub struct App {
     renderer: Option<Renderer>,
     _world: World,
+    mouse_captured: bool,
 }
 
 impl Default for App {
@@ -24,6 +25,7 @@ impl App {
         Self {
             renderer: None,
             _world: World::new(),
+            mouse_captured: false,
         }
     }
 
@@ -45,6 +47,21 @@ impl App {
             renderer.resize(width, height);
         }
     }
+
+    fn toggle_mouse_capture(&mut self) {
+        if let Some(renderer) = &self.renderer {
+            self.mouse_captured = !self.mouse_captured;
+            let window = renderer.window();
+
+            window.set_cursor_visible(!self.mouse_captured);
+
+            if self.mouse_captured {
+                window.set_cursor_grab(CursorGrabMode::Confined).unwrap();
+            } else {
+                window.set_cursor_grab(CursorGrabMode::None).unwrap();
+            }
+        }
+    }
 }
 
 impl ApplicationHandler for App {
@@ -62,6 +79,29 @@ impl ApplicationHandler for App {
 
         self.renderer =
             Some(pollster::block_on(Renderer::new(window)).expect("Renderer should be created"));
+    }
+
+    fn device_event(
+        &mut self,
+        _event_loop: &ActiveEventLoop,
+        _device_id: DeviceId,
+        event: DeviceEvent,
+    ) {
+        if !self.mouse_captured {
+            return;
+        }
+
+        let DeviceEvent::MouseMotion { delta } = event else {
+            return;
+        };
+
+        let Some(renderer) = &mut self.renderer else {
+            return;
+        };
+
+        renderer
+            .camera_controller()
+            .handle_mouse_input(delta.0 as f32, delta.1 as f32);
     }
 
     fn window_event(
@@ -102,7 +142,17 @@ impl ApplicationHandler for App {
                     event_loop.exit();
                 }
                 if let Some(renderer) = &mut self.renderer {
-                    renderer.camera_controller().handle_key(code, is_pressed);
+                    renderer
+                        .camera_controller()
+                        .handle_keyboard_input(code, is_pressed);
+                }
+            }
+            WindowEvent::MouseInput {
+                state: ElementState::Pressed,
+                ..
+            } => {
+                if !self.mouse_captured {
+                    self.toggle_mouse_capture();
                 }
             }
             _ => {}

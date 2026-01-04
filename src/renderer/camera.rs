@@ -3,11 +3,14 @@ use wgpu::util::DeviceExt as _;
 use winit::keyboard::KeyCode;
 
 const CAMERA_STARTING_POSITION: Vec3 = Vec3::new(0.0, 1.0, 2.0);
-const CAMERA_STARTING_TARGET: Vec3 = Vec3::new(0.0, 0.0, 0.0);
 const CAMERA_FOV_Y: f32 = 90.0;
 const CAMERA_Z_NEAR: f32 = 0.1;
 const CAMERA_Z_FAR: f32 = 100.0;
-const CAMERA_SPEED: f32 = 0.03;
+const CAMERA_MOVE_SPEED: f32 = 0.03;
+const CAMERA_MOVE_SPEED_SHIFT_MULTIPLIER: f32 = 3.5;
+const CAMERA_TURN_SPEED: f32 = 0.02;
+const CAMERA_MAX_PITCH: f32 = f32::to_radians(90.0).next_down();
+const MOUSE_SENSITIVITY: f32 = 0.02;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -23,7 +26,8 @@ impl CameraUniform {
 
 pub(crate) struct Camera {
     position: Vec3,
-    target: Vec3,
+    yaw: f32,
+    pitch: f32,
     aspect_ratio: f32,
     uniform: CameraUniform,
     buffer: wgpu::Buffer,
@@ -37,13 +41,22 @@ impl Camera {
         bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let position = CAMERA_STARTING_POSITION;
-        let target = CAMERA_STARTING_TARGET;
+        let yaw: f32 = 0.0;
+        let pitch: f32 = 0.0;
+
         let aspect_ratio = surface_config.width as f32 / surface_config.height as f32;
 
-        let view = glam::Mat4::look_at_rh(position, target, Vec3::Y);
+        let forward = Vec3::new(
+            yaw.cos() * pitch.cos(),
+            pitch.sin(),
+            yaw.sin() * pitch.cos(),
+        )
+        .normalize();
+        let target = position + forward;
+        let view_matrix = glam::Mat4::look_at_rh(position, target, Vec3::Y);
         let projection =
             glam::Mat4::perspective_rh(CAMERA_FOV_Y, aspect_ratio, CAMERA_Z_NEAR, CAMERA_Z_FAR);
-        let view_projection = projection * view;
+        let view_projection = projection * view_matrix;
 
         let uniform = CameraUniform::new(view_projection.to_cols_array_2d());
 
@@ -64,7 +77,8 @@ impl Camera {
 
         Self {
             position,
-            target,
+            yaw,
+            pitch,
             aspect_ratio,
             uniform,
             buffer,
@@ -81,15 +95,30 @@ impl Camera {
         self.update_view_projection();
     }
 
+    fn view_matrix(&self) -> glam::Mat4 {
+        let target = self.position + self.forward();
+        glam::Mat4::look_at_rh(self.position, target, Vec3::Y)
+    }
+
+    fn projection(&self) -> glam::Mat4 {
+        glam::Mat4::perspective_rh(CAMERA_FOV_Y, self.aspect_ratio, CAMERA_Z_NEAR, CAMERA_Z_FAR)
+    }
+
+    fn forward(&self) -> Vec3 {
+        Vec3::new(
+            self.yaw.cos() * self.pitch.cos(),
+            self.pitch.sin(),
+            self.yaw.sin() * self.pitch.cos(),
+        )
+        .normalize()
+    }
+
+    fn right(&self) -> Vec3 {
+        self.forward().cross(Vec3::Y).normalize()
+    }
+
     fn update_view_projection(&mut self) {
-        let view = glam::Mat4::look_at_rh(self.position, self.target, Vec3::Y);
-        let proj = glam::Mat4::perspective_rh(
-            CAMERA_FOV_Y,
-            self.aspect_ratio,
-            CAMERA_Z_NEAR,
-            CAMERA_Z_FAR,
-        );
-        self.uniform.view_projection = (proj * view).to_cols_array_2d();
+        self.uniform.view_projection = (self.projection() * self.view_matrix()).to_cols_array_2d();
     }
 
     pub(crate) fn update_buffer(&self, queue: &wgpu::Queue) {
@@ -98,77 +127,141 @@ impl Camera {
 }
 
 pub(crate) struct CameraController {
-    speed: f32,
+    mouse_sensitivity: f32,
+    mouse_delta: (f32, f32),
     is_forward_pressed: bool,
     is_backward_pressed: bool,
     is_left_pressed: bool,
     is_right_pressed: bool,
+    is_up_pressed: bool,
+    is_down_pressed: bool,
+    is_sprint_pressed: bool,
+    is_turn_left_pressed: bool,
+    is_turn_right_pressed: bool,
+    is_turn_up_pressed: bool,
+    is_turn_down_pressed: bool,
 }
 
 impl CameraController {
     pub(crate) fn new() -> Self {
-        let speed = CAMERA_SPEED;
         Self {
-            speed,
+            mouse_sensitivity: MOUSE_SENSITIVITY,
+            mouse_delta: (0.0, 0.0),
             is_forward_pressed: false,
             is_backward_pressed: false,
             is_left_pressed: false,
             is_right_pressed: false,
+            is_up_pressed: false,
+            is_down_pressed: false,
+            is_sprint_pressed: false,
+            is_turn_left_pressed: false,
+            is_turn_right_pressed: false,
+            is_turn_up_pressed: false,
+            is_turn_down_pressed: false,
         }
     }
 
-    pub(crate) fn handle_key(&mut self, code: KeyCode, is_pressed: bool) -> bool {
+    pub(crate) fn handle_mouse_input(&mut self, delta_x: f32, delta_y: f32) {
+        self.mouse_delta = (delta_x, delta_y);
+    }
+
+    pub(crate) fn handle_keyboard_input(&mut self, code: KeyCode, is_pressed: bool) -> bool {
         match code {
-            KeyCode::KeyW | KeyCode::ArrowUp => {
+            KeyCode::KeyW => {
                 self.is_forward_pressed = is_pressed;
                 true
             }
-            KeyCode::KeyA | KeyCode::ArrowLeft => {
+            KeyCode::KeyA => {
                 self.is_left_pressed = is_pressed;
                 true
             }
-            KeyCode::KeyS | KeyCode::ArrowDown => {
+            KeyCode::KeyS => {
                 self.is_backward_pressed = is_pressed;
                 true
             }
-            KeyCode::KeyD | KeyCode::ArrowRight => {
+            KeyCode::KeyD => {
                 self.is_right_pressed = is_pressed;
+                true
+            }
+            KeyCode::Space => {
+                self.is_up_pressed = is_pressed;
+                true
+            }
+            KeyCode::ControlLeft => {
+                self.is_down_pressed = is_pressed;
+                true
+            }
+            KeyCode::ShiftLeft => {
+                self.is_sprint_pressed = is_pressed;
+                true
+            }
+            KeyCode::ArrowLeft => {
+                self.is_turn_left_pressed = is_pressed;
+                true
+            }
+            KeyCode::ArrowRight => {
+                self.is_turn_right_pressed = is_pressed;
+                true
+            }
+            KeyCode::ArrowUp => {
+                self.is_turn_up_pressed = is_pressed;
+                true
+            }
+            KeyCode::ArrowDown => {
+                self.is_turn_down_pressed = is_pressed;
                 true
             }
             _ => false,
         }
     }
 
-    pub(crate) fn update_camera(&self, camera: &mut Camera) {
-        let forward_vector = camera.target - camera.position;
-        let forward_normalized = forward_vector.normalize();
-        let forward_magnitude = forward_vector.length();
+    pub(crate) fn update_camera(&mut self, camera: &mut Camera) {
+        if self.is_turn_left_pressed {
+            camera.yaw -= CAMERA_TURN_SPEED;
+        }
+        if self.is_turn_right_pressed {
+            camera.yaw += CAMERA_TURN_SPEED;
+        }
+        if self.is_turn_up_pressed {
+            camera.pitch += CAMERA_TURN_SPEED;
+        }
+        if self.is_turn_down_pressed {
+            camera.pitch -= CAMERA_TURN_SPEED;
+        }
 
-        // Prevents glitching when the camera gets too close to the
-        // center of the scene.
-        if self.is_forward_pressed && forward_magnitude > self.speed {
-            camera.position += forward_normalized * self.speed;
+        let (delta_x, delta_y) = self.mouse_delta;
+        camera.yaw += delta_x * self.mouse_sensitivity;
+        camera.pitch -= delta_y * self.mouse_sensitivity;
+        self.mouse_delta = (0.0, 0.0);
+
+        camera.pitch = camera.pitch.clamp(-CAMERA_MAX_PITCH, CAMERA_MAX_PITCH);
+
+        let forward = camera.forward();
+        let right = camera.right();
+
+        let move_speed = if self.is_sprint_pressed {
+            CAMERA_MOVE_SPEED * CAMERA_MOVE_SPEED_SHIFT_MULTIPLIER
+        } else {
+            CAMERA_MOVE_SPEED
+        };
+
+        if self.is_forward_pressed {
+            camera.position += forward * move_speed;
         }
         if self.is_backward_pressed {
-            camera.position -= forward_normalized * self.speed;
+            camera.position -= forward * move_speed;
         }
-
-        let right = forward_normalized.cross(Vec3::Y);
-
-        // Redo radius calc in case the forward/backward is pressed.
-        let forward_vector = camera.target - camera.position;
-        let forward_magnitude = forward_vector.length();
-
         if self.is_right_pressed {
-            // Rescale the distance between the target and the eye so
-            // that it doesn't change. The eye, therefore, still
-            // lies on the circle made by the target and eye.
-            camera.position = camera.target
-                - (forward_vector + right * self.speed).normalize() * forward_magnitude;
+            camera.position += right * move_speed;
         }
         if self.is_left_pressed {
-            camera.position = camera.target
-                - (forward_vector - right * self.speed).normalize() * forward_magnitude;
+            camera.position -= right * move_speed;
+        }
+        if self.is_up_pressed {
+            camera.position += Vec3::Y * move_speed;
+        }
+        if self.is_down_pressed {
+            camera.position -= Vec3::Y * move_speed;
         }
 
         camera.update_view_projection();
