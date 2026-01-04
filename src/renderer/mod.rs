@@ -4,7 +4,6 @@ mod texture;
 
 use camera::{Camera, CameraController};
 use std::sync::Arc;
-use wgpu::{CompositeAlphaMode, PresentMode};
 use winit::window::Window;
 
 pub(crate) struct Renderer {
@@ -57,8 +56,8 @@ impl Renderer {
             format: surface_format,
             width: size.width,
             height: size.height,
-            present_mode: PresentMode::AutoVsync,
-            alpha_mode: CompositeAlphaMode::Auto,
+            present_mode: wgpu::PresentMode::AutoVsync,
+            alpha_mode: wgpu::CompositeAlphaMode::Auto,
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
         };
