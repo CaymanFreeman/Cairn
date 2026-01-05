@@ -10,7 +10,7 @@ use winit::window::{CursorGrabMode, Window};
 
 pub struct App {
     renderer: Option<Renderer>,
-    _world: World,
+    world: Option<World>,
     mouse_captured: bool,
 }
 
@@ -24,7 +24,7 @@ impl App {
     pub fn new() -> Self {
         Self {
             renderer: None,
-            _world: World::new(),
+            world: None,
             mouse_captured: false,
         }
     }
@@ -70,6 +70,15 @@ impl ApplicationHandler for App {
             return;
         }
 
+        let mut world = match World::new() {
+            Ok(world) => world,
+            Err(error) => {
+                error!("Failed to initialize world: {error}");
+                event_loop.exit();
+                return;
+            }
+        };
+
         let window_attributes = Window::default_attributes().with_title("Cairn");
         let window = Arc::new(
             event_loop
@@ -77,8 +86,17 @@ impl ApplicationHandler for App {
                 .expect("Window should be created"),
         );
 
-        self.renderer =
-            Some(pollster::block_on(Renderer::new(window)).expect("Renderer should be created"));
+        let renderer = match pollster::block_on(Renderer::new(window, &mut world)) {
+            Ok(renderer) => renderer,
+            Err(error) => {
+                error!("Failed to create renderer: {error}");
+                event_loop.exit();
+                return;
+            }
+        };
+
+        self.world = Some(world);
+        self.renderer = Some(renderer);
     }
 
     fn device_event(

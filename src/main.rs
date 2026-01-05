@@ -4,7 +4,9 @@ use cairn::App;
 use winit::event_loop::EventLoop;
 
 fn main() -> anyhow::Result<()> {
-    env_logger::init();
+    env_logger::Builder::from_default_env()
+        .filter_level(log::LevelFilter::Info)
+        .init();
 
     let event_loop = EventLoop::with_user_event().build()?;
     let mut app = App::default();

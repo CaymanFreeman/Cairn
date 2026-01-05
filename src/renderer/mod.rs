@@ -4,6 +4,7 @@ mod texture;
 
 use crate::renderer::pipeline::create_camera_bind_group_layout;
 use crate::world::chunk::Chunk;
+use crate::world::World;
 use camera::{Camera, CameraController};
 use pipeline::{
     create_index_buffer, create_render_pipeline, create_surface_config,
@@ -30,7 +31,7 @@ pub(crate) struct Renderer {
 }
 
 impl Renderer {
-    pub(crate) async fn new(window: Arc<Window>) -> anyhow::Result<Self> {
+    pub(crate) async fn new(window: Arc<Window>, world: &mut World) -> anyhow::Result<Self> {
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
             ..Default::default()
@@ -59,14 +60,18 @@ impl Renderer {
 
         let texture_bind_group_layout = create_texture_bind_group_layout(&device);
 
-        let diffuse_texture = Texture::diffuse_from_bytes(
+        let (diffuse_texture, texture_widths) = Texture::create_diffuse_texture(
             &device,
             &queue,
             &texture_bind_group_layout,
-            include_bytes!("../../assets/tree.png"),
-            "tree.png",
-        )
-        .expect("Tree image should load");
+            "atlas.png",
+            world.registry(),
+        );
+
+        let atlas_width: u32 = texture_widths.iter().sum();
+        world
+            .registry_mut()
+            .update_texture_coordinates(&texture_widths, atlas_width);
 
         let depth_texture = Texture::new_depth_texture(&device, &surface_config, "Depth Texture");
 
@@ -74,7 +79,7 @@ impl Renderer {
         let camera = Camera::new(&device, &surface_config, &camera_bind_group_layout);
         let camera_controller = CameraController::new();
 
-        let chunk_mesh = Chunk::new([0, 0, 0]).generate_mesh();
+        let chunk_mesh = Chunk::new([0, 0, 0], world.registry()).generate_mesh(world.registry());
         let vertex_buffer = create_vertex_buffer(&device, chunk_mesh.vertices_u8());
         let index_buffer = create_index_buffer(&device, chunk_mesh.indices_u8());
         let index_count = chunk_mesh.index_count();

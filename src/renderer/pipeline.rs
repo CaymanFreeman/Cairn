@@ -3,6 +3,9 @@ use crate::world::Vertex;
 use wgpu::util::DeviceExt as _;
 use winit::dpi::PhysicalSize;
 
+const WORLD_SHADER: wgpu::ShaderModuleDescriptor<'_> =
+    wgpu::include_wgsl!("../../shaders/world.wgsl");
+
 pub(crate) fn create_surface_config(
     window_size: PhysicalSize<u32>,
     surface: &wgpu::Surface<'_>,
@@ -38,7 +41,7 @@ pub(crate) fn create_render_pipeline(
     config: &wgpu::SurfaceConfiguration,
     bind_group_layouts: &[&wgpu::BindGroupLayout],
 ) -> wgpu::RenderPipeline {
-    let shader = device.create_shader_module(wgpu::include_wgsl!("../../shaders/shader.wgsl"));
+    let shader = device.create_shader_module(WORLD_SHADER);
     let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("Render Pipeline Layout"),
         bind_group_layouts,
