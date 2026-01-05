@@ -6,7 +6,9 @@ use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, DeviceId, ElementState, KeyEvent, WindowEvent};
 use winit::event_loop::ActiveEventLoop;
 use winit::keyboard::{KeyCode, PhysicalKey};
-use winit::window::{CursorGrabMode, Window};
+use winit::window::{CursorGrabMode, Icon, Window};
+
+const WINDOW_ICON: &[u8] = include_bytes!("../assets/icon.png");
 
 pub struct App {
     renderer: Option<Renderer>,
@@ -79,7 +81,19 @@ impl ApplicationHandler for App {
             }
         };
 
-        let window_attributes = Window::default_attributes().with_title("Cairn");
+        let (icon_rgba, icon_width, icon_height) = {
+            let image = image::load_from_memory(WINDOW_ICON)
+                .expect("Icon image should load")
+                .into_rgba8();
+            let (width, height) = image.dimensions();
+            let rgba = image.into_raw();
+            (rgba, width, height)
+        };
+        let icon = Icon::from_rgba(icon_rgba, icon_width, icon_height)
+            .expect("Icon image should build from rgba");
+        let window_attributes = Window::default_attributes()
+            .with_title("Cairn")
+            .with_window_icon(Some(icon));
         let window = Arc::new(
             event_loop
                 .create_window(window_attributes)
@@ -97,29 +111,6 @@ impl ApplicationHandler for App {
 
         self.world = Some(world);
         self.renderer = Some(renderer);
-    }
-
-    fn device_event(
-        &mut self,
-        _event_loop: &ActiveEventLoop,
-        _device_id: DeviceId,
-        event: DeviceEvent,
-    ) {
-        if !self.mouse_captured {
-            return;
-        }
-
-        let DeviceEvent::MouseMotion { delta } = event else {
-            return;
-        };
-
-        let Some(renderer) = &mut self.renderer else {
-            return;
-        };
-
-        renderer
-            .camera_controller()
-            .handle_mouse_input(delta.0 as f32, delta.1 as f32);
     }
 
     fn window_event(
@@ -175,5 +166,28 @@ impl ApplicationHandler for App {
             }
             _ => {}
         }
+    }
+
+    fn device_event(
+        &mut self,
+        _event_loop: &ActiveEventLoop,
+        _device_id: DeviceId,
+        event: DeviceEvent,
+    ) {
+        if !self.mouse_captured {
+            return;
+        }
+
+        let DeviceEvent::MouseMotion { delta } = event else {
+            return;
+        };
+
+        let Some(renderer) = &mut self.renderer else {
+            return;
+        };
+
+        renderer
+            .camera_controller()
+            .handle_mouse_input(delta.0 as f32, delta.1 as f32);
     }
 }
