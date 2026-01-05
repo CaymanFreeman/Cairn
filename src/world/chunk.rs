@@ -5,16 +5,20 @@ use std::ops::RangeInclusive;
 const CHUNK_SIZE: usize = 32;
 
 pub(crate) struct Chunk {
-    _position: [i32; 3],
+    position: [i32; 3],
     voxels: Vec<Option<u16>>,
 }
 
 impl Chunk {
-    pub(crate) fn new(_position: [i32; 3], registry: &VoxelRegistry) -> Self {
-        let mut chunk = Self {
-            _position,
+    fn empty(position: [i32; 3]) -> Self {
+        Self {
+            position,
             voxels: vec![None; CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE],
-        };
+        }
+    }
+
+    pub(crate) fn new(position: [i32; 3], registry: &VoxelRegistry) -> Self {
+        let mut chunk = Self::empty(position);
 
         if let Some(id) = registry.get_id("stone") {
             chunk.set_y_range(0..=5, Some(id));
