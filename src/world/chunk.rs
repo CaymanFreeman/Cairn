@@ -1,4 +1,4 @@
-use crate::world::{Mesh, Voxel, VoxelRegistry};
+use crate::world::{voxel, Mesh, Voxel, VoxelRegistry};
 use log::warn;
 use std::ops::RangeInclusive;
 
@@ -39,15 +39,49 @@ impl Chunk {
         x + y * CHUNK_SIZE + z * CHUNK_SIZE * CHUNK_SIZE
     }
 
+    fn get_voxel_exposed_faces(&self, chunk_position: [u8; 3]) -> Vec<voxel::Face> {
+        let mut faces = Vec::new();
+        let (x, y, z) = (
+            chunk_position[0] as isize,
+            chunk_position[1] as isize,
+            chunk_position[2] as isize,
+        );
+
+        if self.get_voxel(x, y, z + 1).is_none() {
+            faces.push(voxel::Face::Front);
+        }
+        if self.get_voxel(x, y, z - 1).is_none() {
+            faces.push(voxel::Face::Back);
+        }
+        if self.get_voxel(x + 1, y, z).is_none() {
+            faces.push(voxel::Face::Right);
+        }
+        if self.get_voxel(x - 1, y, z).is_none() {
+            faces.push(voxel::Face::Left);
+        }
+        if self.get_voxel(x, y + 1, z).is_none() {
+            faces.push(voxel::Face::Top);
+        }
+        if self.get_voxel(x, y - 1, z).is_none() {
+            faces.push(voxel::Face::Bottom);
+        }
+        faces
+    }
+
     pub(crate) fn generate_mesh(&self, registry: &VoxelRegistry) -> Mesh {
         let mut voxel_meshes = Vec::new();
 
         for x in 0..CHUNK_SIZE {
             for y in 0..CHUNK_SIZE {
                 for z in 0..CHUNK_SIZE {
-                    if let Some(definition_id) = self.get_voxel(x, y, z) {
-                        let voxel = Voxel::new([x as u8, y as u8, z as u8], definition_id);
-                        voxel_meshes.push(voxel.generate_mesh(registry));
+                    if let Some(definition_id) = self.get_voxel(x as isize, y as isize, z as isize)
+                    {
+                        let chunk_position = [x as u8, y as u8, z as u8];
+                        let voxel = Voxel::new(chunk_position, definition_id);
+                        voxel_meshes.push(voxel.generate_mesh(
+                            registry,
+                            &self.get_voxel_exposed_faces(chunk_position),
+                        ));
                     }
                 }
             }
@@ -112,12 +146,17 @@ impl Chunk {
     }
 
     #[expect(clippy::indexing_slicing)]
-    pub(crate) fn get_voxel(&self, x: usize, y: usize, z: usize) -> Option<u16> {
-        if x >= CHUNK_SIZE || y >= CHUNK_SIZE || z >= CHUNK_SIZE {
-            warn!("Attempted to get voxel outside chunk bounds: ({x}, {y}, {z})");
+    pub(crate) fn get_voxel(&self, x: isize, y: isize, z: isize) -> Option<u16> {
+        if x < 0
+            || y < 0
+            || z < 0
+            || x >= CHUNK_SIZE as isize
+            || y >= CHUNK_SIZE as isize
+            || z >= CHUNK_SIZE as isize
+        {
             return None;
         }
 
-        self.voxels[Self::index(x, y, z)]
+        self.voxels[Self::index(x as usize, y as usize, z as usize)]
     }
 }

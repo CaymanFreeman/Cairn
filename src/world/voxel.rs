@@ -4,6 +4,16 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::Path;
 
+#[derive(PartialEq)]
+pub(crate) enum Face {
+    Front,
+    Back,
+    Right,
+    Left,
+    Top,
+    Bottom,
+}
+
 #[derive(Copy, Clone)]
 pub(crate) struct Voxel {
     chunk_position: [u8; 3],
@@ -33,7 +43,7 @@ impl Voxel {
         self.definition_id
     }
 
-    pub(crate) fn generate_mesh(&self, registry: &VoxelRegistry) -> Mesh {
+    pub(crate) fn generate_mesh(&self, registry: &VoxelRegistry, faces: &[Face]) -> Mesh {
         let (x, y, z) = (
             self.chunk_position[0] as f32,
             self.chunk_position[1] as f32,
@@ -47,54 +57,63 @@ impl Voxel {
 
         let (u_min, v_min, u_max, v_max) = definition.texture_coordinates;
 
-        #[rustfmt::skip]
-        let vertices = vec![
-            // Front (Z+)
-            Vertex::new([x - 0.5, y - 0.5, z + 0.5], [u_min, v_max]),
-            Vertex::new([x + 0.5, y - 0.5, z + 0.5], [u_max, v_max]),
-            Vertex::new([x + 0.5, y + 0.5, z + 0.5], [u_max, v_min]),
-            Vertex::new([x - 0.5, y + 0.5, z + 0.5], [u_min, v_min]),
+        let mut vertices = Vec::new();
+        let mut indices = Vec::new();
 
-            // Back (Z-)
-            Vertex::new([x - 0.5, y - 0.5, z - 0.5], [u_max, v_max]),
-            Vertex::new([x - 0.5, y + 0.5, z - 0.5], [u_max, v_min]),
-            Vertex::new([x + 0.5, y + 0.5, z - 0.5], [u_min, v_min]),
-            Vertex::new([x + 0.5, y - 0.5, z - 0.5], [u_min, v_max]),
-
-            // Right (X+)
-            Vertex::new([x + 0.5, y - 0.5, z - 0.5], [u_max, v_max]),
-            Vertex::new([x + 0.5, y + 0.5, z - 0.5], [u_max, v_min]),
-            Vertex::new([x + 0.5, y + 0.5, z + 0.5], [u_min, v_min]),
-            Vertex::new([x + 0.5, y - 0.5, z + 0.5], [u_min, v_max]),
-
-            // Left (X-)
-            Vertex::new([x - 0.5, y - 0.5, z - 0.5], [u_min, v_max]),
-            Vertex::new([x - 0.5, y - 0.5, z + 0.5], [u_max, v_max]),
-            Vertex::new([x - 0.5, y + 0.5, z + 0.5], [u_max, v_min]),
-            Vertex::new([x - 0.5, y + 0.5, z - 0.5], [u_min, v_min]),
-
-            // Top (Y+)
-            Vertex::new([x - 0.5, y + 0.5, z - 0.5], [u_min, v_min]),
-            Vertex::new([x - 0.5, y + 0.5, z + 0.5], [u_min, v_max]),
-            Vertex::new([x + 0.5, y + 0.5, z + 0.5], [u_max, v_max]),
-            Vertex::new([x + 0.5, y + 0.5, z - 0.5], [u_max, v_min]),
-
-            // Bottom (Y-)
-            Vertex::new([x - 0.5, y - 0.5, z - 0.5], [u_min, v_max]),
-            Vertex::new([x + 0.5, y - 0.5, z - 0.5], [u_max, v_max]),
-            Vertex::new([x + 0.5, y - 0.5, z + 0.5], [u_max, v_min]),
-            Vertex::new([x - 0.5, y - 0.5, z + 0.5], [u_min, v_min]),
-        ];
-
-        #[rustfmt::skip]
-        let indices = vec![
-            0, 1, 2, 2, 3, 0,       // Front
-            4, 5, 6, 6, 7, 4,       // Back
-            8, 9, 10, 10, 11, 8,    // Right
-            12, 13, 14, 14, 15, 12, // Left
-            16, 17, 18, 18, 19, 16, // Top
-            20, 21, 22, 22, 23, 20, // Bottom
-        ];
+        if faces.contains(&Face::Front) {
+            vertices.extend(vec![
+                Vertex::new([x - 0.5, y - 0.5, z + 0.5], [u_min, v_max]),
+                Vertex::new([x + 0.5, y - 0.5, z + 0.5], [u_max, v_max]),
+                Vertex::new([x + 0.5, y + 0.5, z + 0.5], [u_max, v_min]),
+                Vertex::new([x - 0.5, y + 0.5, z + 0.5], [u_min, v_min]),
+            ]);
+            Mesh::extend_indices(&vertices, &mut indices);
+        }
+        if faces.contains(&Face::Back) {
+            vertices.extend(vec![
+                Vertex::new([x - 0.5, y - 0.5, z - 0.5], [u_max, v_max]),
+                Vertex::new([x - 0.5, y + 0.5, z - 0.5], [u_max, v_min]),
+                Vertex::new([x + 0.5, y + 0.5, z - 0.5], [u_min, v_min]),
+                Vertex::new([x + 0.5, y - 0.5, z - 0.5], [u_min, v_max]),
+            ]);
+            Mesh::extend_indices(&vertices, &mut indices);
+        }
+        if faces.contains(&Face::Right) {
+            vertices.extend(vec![
+                Vertex::new([x + 0.5, y - 0.5, z - 0.5], [u_max, v_max]),
+                Vertex::new([x + 0.5, y + 0.5, z - 0.5], [u_max, v_min]),
+                Vertex::new([x + 0.5, y + 0.5, z + 0.5], [u_min, v_min]),
+                Vertex::new([x + 0.5, y - 0.5, z + 0.5], [u_min, v_max]),
+            ]);
+            Mesh::extend_indices(&vertices, &mut indices);
+        }
+        if faces.contains(&Face::Left) {
+            vertices.extend(vec![
+                Vertex::new([x - 0.5, y - 0.5, z - 0.5], [u_min, v_max]),
+                Vertex::new([x - 0.5, y - 0.5, z + 0.5], [u_max, v_max]),
+                Vertex::new([x - 0.5, y + 0.5, z + 0.5], [u_max, v_min]),
+                Vertex::new([x - 0.5, y + 0.5, z - 0.5], [u_min, v_min]),
+            ]);
+            Mesh::extend_indices(&vertices, &mut indices);
+        }
+        if faces.contains(&Face::Top) {
+            vertices.extend(vec![
+                Vertex::new([x - 0.5, y + 0.5, z - 0.5], [u_min, v_min]),
+                Vertex::new([x - 0.5, y + 0.5, z + 0.5], [u_min, v_max]),
+                Vertex::new([x + 0.5, y + 0.5, z + 0.5], [u_max, v_max]),
+                Vertex::new([x + 0.5, y + 0.5, z - 0.5], [u_max, v_min]),
+            ]);
+            Mesh::extend_indices(&vertices, &mut indices);
+        }
+        if faces.contains(&Face::Bottom) {
+            vertices.extend(vec![
+                Vertex::new([x - 0.5, y - 0.5, z - 0.5], [u_min, v_max]),
+                Vertex::new([x + 0.5, y - 0.5, z - 0.5], [u_max, v_max]),
+                Vertex::new([x + 0.5, y - 0.5, z + 0.5], [u_max, v_min]),
+                Vertex::new([x - 0.5, y - 0.5, z + 0.5], [u_min, v_min]),
+            ]);
+            Mesh::extend_indices(&vertices, &mut indices);
+        }
 
         Mesh::new(vertices, indices)
     }

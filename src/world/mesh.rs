@@ -62,4 +62,16 @@ impl Mesh {
     pub(crate) fn index_count(&self) -> u32 {
         self.indices.len() as u32
     }
+
+    pub(crate) fn extend_indices(vertices: &[Vertex], indices: &mut Vec<u32>) {
+        let vertex_count = vertices.len() as u32;
+        indices.extend(vec![
+            vertex_count,
+            vertex_count + 1,
+            vertex_count + 2,
+            vertex_count + 2,
+            vertex_count + 3,
+            vertex_count,
+        ]);
+    }
 }

@@ -2,7 +2,7 @@ use glam::f32::Vec3;
 use wgpu::util::DeviceExt as _;
 use winit::keyboard::KeyCode;
 
-const CAMERA_STARTING_POSITION: Vec3 = Vec3::new(0.0, 1.0, 2.0);
+const CAMERA_STARTING_POSITION: Vec3 = Vec3::new(0.0, 12.0, 0.0);
 const CAMERA_FOV_Y: f32 = 90.0;
 const CAMERA_Z_NEAR: f32 = 0.1;
 const CAMERA_Z_FAR: f32 = 100.0;
