@@ -3,7 +3,7 @@ mod pipeline;
 mod texture;
 
 use crate::renderer::pipeline::create_camera_bind_group_layout;
-use crate::world::voxel::Voxel;
+use crate::world::chunk::Chunk;
 use camera::{Camera, CameraController};
 use pipeline::{
     create_index_buffer, create_render_pipeline, create_surface_config,
@@ -74,10 +74,10 @@ impl Renderer {
         let camera = Camera::new(&device, &surface_config, &camera_bind_group_layout);
         let camera_controller = CameraController::new();
 
-        let cube_mesh = Voxel::new([0, 0, 0]).generate_mesh();
-        let vertex_buffer = create_vertex_buffer(&device, cube_mesh.vertices());
-        let index_buffer = create_index_buffer(&device, cube_mesh.indices());
-        let index_count = cube_mesh.index_count();
+        let chunk_mesh = Chunk::new([0, 0, 0]).generate_mesh();
+        let vertex_buffer = create_vertex_buffer(&device, chunk_mesh.vertices_u8());
+        let index_buffer = create_index_buffer(&device, chunk_mesh.indices_u8());
+        let index_count = chunk_mesh.index_count();
 
         let render_pipeline = create_render_pipeline(
             &device,
@@ -172,7 +172,7 @@ impl Renderer {
         render_pass.set_bind_group(0, &self.diffuse_texture.bind_group(), &[]);
         render_pass.set_bind_group(1, &self.camera.bind_group(), &[]);
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+        render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
         render_pass.draw_indexed(0..self.index_count, 0, 0..1);
         drop(render_pass);
 

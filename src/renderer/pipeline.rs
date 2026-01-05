@@ -1,5 +1,5 @@
 use crate::renderer::texture::Texture;
-use crate::world::voxel::Vertex;
+use crate::world::Vertex;
 use wgpu::util::DeviceExt as _;
 use winit::dpi::PhysicalSize;
 

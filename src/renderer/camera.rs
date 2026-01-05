@@ -9,7 +9,7 @@ const CAMERA_Z_FAR: f32 = 100.0;
 const CAMERA_MOVE_SPEED: f32 = 0.03;
 const CAMERA_MOVE_SPEED_SHIFT_MULTIPLIER: f32 = 3.5;
 const CAMERA_TURN_SPEED: f32 = 0.02;
-const CAMERA_MAX_PITCH: f32 = f32::to_radians(90.0).next_down();
+const CAMERA_MAX_PITCH: f32 = f32::to_radians(89.9);
 const MOUSE_SENSITIVITY: f32 = 0.02;
 
 #[repr(C)]
