@@ -25,7 +25,7 @@ impl Chunk {
 
         chunk.set_y_slice(31, VoxelType::Grass);
         chunk.set_y_range(27..=30, VoxelType::Dirt);
-        chunk.set_y_range(0..=29, VoxelType::Stone);
+        chunk.set_y_range(0..=26, VoxelType::Stone);
 
         chunk
     }
