@@ -50,21 +50,30 @@ impl App {
         }
     }
 
-    fn toggle_mouse_capture(&mut self) {
+    fn grab_mouse(&mut self) {
         if let Some(renderer) = &self.renderer {
-            self.mouse_captured = !self.mouse_captured;
             let window = renderer.window();
 
-            window.set_cursor_visible(!self.mouse_captured);
-
-            if self.mouse_captured {
+            if !self.mouse_captured {
                 window
                     .set_cursor_grab(CursorGrabMode::Confined)
                     .expect("Window should grab cursor");
-            } else {
+                self.mouse_captured = true;
+                window.set_cursor_visible(!self.mouse_captured);
+            }
+        }
+    }
+
+    fn release_mouse(&mut self) {
+        if let Some(renderer) = &self.renderer {
+            let window = renderer.window();
+
+            if self.mouse_captured {
                 window
                     .set_cursor_grab(CursorGrabMode::None)
                     .expect("Window should let go of cursor");
+                self.mouse_captured = false;
+                window.set_cursor_visible(!self.mouse_captured);
             }
         }
     }
@@ -145,7 +154,7 @@ impl ApplicationHandler for App {
             } => {
                 let is_pressed = key_state.is_pressed();
                 if code == KeyCode::Escape && is_pressed {
-                    event_loop.exit();
+                    self.release_mouse();
                 }
                 if let Some(renderer) = &mut self.renderer {
                     renderer
@@ -157,9 +166,7 @@ impl ApplicationHandler for App {
                 state: ElementState::Pressed,
                 ..
             } => {
-                if !self.mouse_captured {
-                    self.toggle_mouse_capture();
-                }
+                self.grab_mouse();
             }
             _ => {}
         }
