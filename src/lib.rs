@@ -1,7 +1,6 @@
 #![warn(clippy::all, rust_2018_idioms)]
 
 mod app;
-mod renderer;
-mod world;
+mod game;
 
 pub use app::App;

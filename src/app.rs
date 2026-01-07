@@ -1,5 +1,5 @@
-use crate::renderer::Renderer;
-use crate::world::World;
+use crate::game::render::Renderer;
+use crate::game::world::World;
 use log::error;
 use std::sync::Arc;
 use winit::application::ApplicationHandler;
@@ -58,9 +58,13 @@ impl App {
             window.set_cursor_visible(!self.mouse_captured);
 
             if self.mouse_captured {
-                window.set_cursor_grab(CursorGrabMode::Confined).unwrap();
+                window
+                    .set_cursor_grab(CursorGrabMode::Confined)
+                    .expect("Window should grab cursor");
             } else {
-                window.set_cursor_grab(CursorGrabMode::None).unwrap();
+                window
+                    .set_cursor_grab(CursorGrabMode::None)
+                    .expect("Window should let go of cursor");
             }
         }
     }
@@ -72,14 +76,7 @@ impl ApplicationHandler for App {
             return;
         }
 
-        let mut world = match World::new() {
-            Ok(world) => world,
-            Err(error) => {
-                error!("Failed to initialize world: {error}");
-                event_loop.exit();
-                return;
-            }
-        };
+        let world = World::dev_world();
 
         let (icon_rgba, icon_width, icon_height) = {
             let image = image::load_from_memory(WINDOW_ICON)
@@ -100,7 +97,7 @@ impl ApplicationHandler for App {
                 .expect("Window should be created"),
         );
 
-        let renderer = match pollster::block_on(Renderer::new(window, &mut world)) {
+        let renderer = match pollster::block_on(Renderer::new(window, &world)) {
             Ok(renderer) => renderer,
             Err(error) => {
                 error!("Failed to create renderer: {error}");
