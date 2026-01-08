@@ -126,7 +126,7 @@ impl Mesh {
             for y in 0..CHUNK_SIZE {
                 for z in 0..CHUNK_SIZE {
                     let local_position = LocalChunkPosition::new(x, y, z);
-                    let world_position = local_position.clone().as_world_position(chunk.position());
+                    let world_position = local_position.clone().world_position(chunk.position());
                     let voxel_type = chunk.get_voxel_type(local_position);
                     let voxel_properties = voxel_registry.get_properties(&voxel_type);
                     if voxel_properties.is_invisible() {

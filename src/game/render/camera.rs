@@ -1,3 +1,4 @@
+use crate::game::world::WorldPosition;
 use glam::f32::Vec3;
 use wgpu::util::DeviceExt as _;
 use winit::keyboard::KeyCode;
@@ -115,6 +116,15 @@ impl Camera {
 
     fn right(&self) -> Vec3 {
         self.forward().cross(Vec3::Y).normalize()
+    }
+
+    pub(crate) fn position(&self) -> WorldPosition {
+        let (x, y, z) = (
+            self.position.x as i32,
+            self.position.y as i32,
+            self.position.z as i32,
+        );
+        WorldPosition::new(x, y, z)
     }
 
     fn update_view_projection(&mut self) {

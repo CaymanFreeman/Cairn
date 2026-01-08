@@ -111,8 +111,19 @@ impl Renderer {
         &self.window
     }
 
+    pub(crate) fn camera(&self) -> &Camera {
+        &self.camera
+    }
+
     pub(crate) fn camera_controller(&mut self) -> &mut CameraController {
         &mut self.camera_controller
+    }
+
+    pub(crate) fn update_mesh(&mut self, world: &World) {
+        let world_mesh = Mesh::world(world);
+        self.vertex_buffer = create_vertex_buffer(&self.device, world_mesh.vertices_u8());
+        self.index_buffer = create_index_buffer(&self.device, world_mesh.indices_u8());
+        self.index_count = world_mesh.index_count();
     }
 
     pub(crate) fn update(&mut self) {
@@ -173,12 +184,15 @@ impl Renderer {
             timestamp_writes: None,
             multiview_mask: None,
         });
-        render_pass.set_pipeline(&self.render_pipeline);
-        render_pass.set_bind_group(0, &self.diffuse_texture.bind_group(), &[]);
-        render_pass.set_bind_group(1, &self.camera.bind_group(), &[]);
-        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-        render_pass.draw_indexed(0..self.index_count, 0, 0..1);
+
+        if self.index_count > 0 {
+            render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.set_bind_group(0, &self.diffuse_texture.bind_group(), &[]);
+            render_pass.set_bind_group(1, &self.camera.bind_group(), &[]);
+            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+            render_pass.draw_indexed(0..self.index_count, 0, 0..1);
+        }
         drop(render_pass);
 
         self.queue.submit(std::iter::once(encoder.finish()));
@@ -314,6 +328,13 @@ fn create_camera_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayo
 }
 
 fn create_vertex_buffer(device: &wgpu::Device, contents: &[u8]) -> wgpu::Buffer {
+    if contents.is_empty() {
+        return device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Vertex Buffer (empty)"),
+            contents: &[0u8; 1],
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+    }
     device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Vertex Buffer"),
         contents,
@@ -322,6 +343,13 @@ fn create_vertex_buffer(device: &wgpu::Device, contents: &[u8]) -> wgpu::Buffer 
 }
 
 fn create_index_buffer(device: &wgpu::Device, contents: &[u8]) -> wgpu::Buffer {
+    if contents.is_empty() {
+        return device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Index Buffer (empty)"),
+            contents: &[0u8; 1],
+            usage: wgpu::BufferUsages::INDEX,
+        });
+    }
     device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Index Buffer"),
         contents,

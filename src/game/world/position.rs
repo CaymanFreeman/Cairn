@@ -15,9 +15,18 @@ impl WorldPosition {
     pub(crate) fn get_f32(&self) -> (f32, f32, f32) {
         (self.x as f32, self.y as f32, self.z as f32)
     }
+
+    pub(crate) fn chunk_position(&self) -> ChunkPosition {
+        let (x, y, z) = (
+            self.x.div_euclid(CHUNK_SIZE as i32),
+            self.y.div_euclid(CHUNK_SIZE as i32),
+            self.z.div_euclid(CHUNK_SIZE as i32),
+        );
+        ChunkPosition::new(x, y, z)
+    }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Hash, Eq, PartialEq)]
 pub(crate) struct ChunkPosition {
     x: i32,
     y: i32,
@@ -27,6 +36,10 @@ pub(crate) struct ChunkPosition {
 impl ChunkPosition {
     pub(crate) fn new(x: i32, y: i32, z: i32) -> Self {
         Self { x, y, z }
+    }
+
+    pub(crate) fn get(&self) -> (i32, i32, i32) {
+        (self.x, self.y, self.z)
     }
 }
 
@@ -98,7 +111,7 @@ impl LocalChunkPosition {
         (self.x as i32, self.y as i32, self.z as i32)
     }
 
-    pub(crate) fn as_world_position(&self, chunk_position: ChunkPosition) -> WorldPosition {
+    pub(crate) fn world_position(&self, chunk_position: ChunkPosition) -> WorldPosition {
         let (local_x, local_y, local_z) = self.get_i32();
         let (offset_x, offset_y, offset_z) = (
             chunk_position.x * CHUNK_SIZE as i32,

@@ -32,8 +32,14 @@ impl App {
     }
 
     fn update(&mut self) {
-        if let Some(renderer) = &mut self.renderer {
+        if let (Some(renderer), Some(world)) = (&mut self.renderer, &mut self.world) {
             renderer.update();
+            let chunk_position = renderer.camera().position().chunk_position();
+
+            if world.last_update_position() != Some(chunk_position) {
+                world.update_chunks(chunk_position);
+                renderer.update_mesh(world);
+            }
         }
     }
 
@@ -85,7 +91,7 @@ impl ApplicationHandler for App {
             return;
         }
 
-        let world = World::dev_world();
+        let mut world = World::new();
 
         let (icon_rgba, icon_width, icon_height) = {
             let image = image::load_from_memory(WINDOW_ICON)
@@ -107,7 +113,12 @@ impl ApplicationHandler for App {
         );
 
         let renderer = match pollster::block_on(Renderer::new(window, &world)) {
-            Ok(renderer) => renderer,
+            Ok(mut renderer) => {
+                let chunk_position = renderer.camera().position().chunk_position();
+                world.update_chunks(chunk_position);
+                renderer.update_mesh(&world);
+                renderer
+            }
             Err(error) => {
                 error!("Failed to create renderer: {error}");
                 event_loop.exit();
