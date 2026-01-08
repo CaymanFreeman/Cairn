@@ -6,7 +6,7 @@ use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, DeviceId, ElementState, KeyEvent, WindowEvent};
 use winit::event_loop::ActiveEventLoop;
 use winit::keyboard::{KeyCode, PhysicalKey};
-use winit::window::{CursorGrabMode, Icon, Window};
+use winit::window::{CursorGrabMode, Fullscreen, Icon, Window};
 
 const WINDOW_ICON: &[u8] = include_bytes!("../assets/icon.png");
 
@@ -103,9 +103,12 @@ impl ApplicationHandler for App {
         };
         let icon = Icon::from_rgba(icon_rgba, icon_width, icon_height)
             .expect("Icon image should build from rgba");
+
         let window_attributes = Window::default_attributes()
             .with_title("Cairn")
-            .with_window_icon(Some(icon));
+            .with_window_icon(Some(icon))
+            .with_maximized(true);
+
         let window = Arc::new(
             event_loop
                 .create_window(window_attributes)
