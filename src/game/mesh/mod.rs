@@ -152,7 +152,7 @@ impl Mesh {
         let texture_atlas = world.texture_atlas();
         let chunk_meshes = world
             .chunks()
-            .iter()
+            .values()
             .map(|chunk| Self::chunk(world, chunk, voxel_registry, texture_atlas))
             .collect();
         Self::merged(chunk_meshes)

@@ -1,11 +1,12 @@
 mod position;
 
+pub(crate) use position::*;
+
 use crate::game::chunk::Chunk;
 use crate::game::mesh::OccludingVoxelNeighbors;
 use crate::game::render::TextureAtlas;
 use crate::game::voxel::{VoxelRegistry, VoxelType};
-pub(crate) use position::*;
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 const RENDER_DISTANCE: u16 = 5;
 
@@ -14,7 +15,7 @@ pub(crate) struct World {
     texture_atlas: TextureAtlas,
     render_distance: u16,
     last_update_position: Option<ChunkPosition>,
-    chunks: Vec<Chunk>,
+    chunks: HashMap<ChunkPosition, Chunk>,
 }
 
 impl World {
@@ -26,7 +27,7 @@ impl World {
             texture_atlas,
             render_distance: RENDER_DISTANCE,
             last_update_position: None,
-            chunks: vec![],
+            chunks: HashMap::new(),
         }
     }
 
@@ -35,17 +36,6 @@ impl World {
 
         let render_distance = self.render_distance as i32;
         let (origin_x, origin_y, origin_z) = chunk_position.get();
-
-        self.chunks.retain(|chunk| {
-            let (chunk_x, chunk_y, chunk_z) = chunk.position().get();
-            let distance_squared = (chunk_x - origin_x).pow(2)
-                + (chunk_y - origin_y).pow(2)
-                + (chunk_z - origin_z).pow(2);
-            distance_squared <= render_distance.pow(2) && chunk_y == 0
-        });
-
-        let existing_chunks: HashSet<ChunkPosition> =
-            self.chunks.iter().map(|chunk| chunk.position()).collect();
 
         let (min_x, max_x) = (origin_x - render_distance, origin_x + render_distance);
         let (min_y, max_y) = (origin_y - render_distance, origin_y + render_distance);
@@ -57,10 +47,9 @@ impl World {
                     let distance_squared =
                         (x - origin_x).pow(2) + (y - origin_y).pow(2) + (z - origin_z).pow(2);
                     if distance_squared <= render_distance.pow(2) && y == 0 {
-                        let pos = ChunkPosition::new(x, y, z);
-                        if !existing_chunks.contains(&pos) {
-                            self.chunks.push(Chunk::dev_chunk(pos));
-                        }
+                        let chunk_position = ChunkPosition::new(x, y, z);
+                        self.chunks
+                            .insert(chunk_position, Chunk::dev_chunk(chunk_position));
                     }
                 }
             }
@@ -75,7 +64,7 @@ impl World {
         &self.texture_atlas
     }
 
-    pub(crate) fn chunks(&self) -> &Vec<Chunk> {
+    pub(crate) fn chunks(&self) -> &HashMap<ChunkPosition, Chunk> {
         &self.chunks
     }
 
@@ -84,9 +73,7 @@ impl World {
     }
 
     fn get_chunk(&self, chunk_position: ChunkPosition) -> Option<&Chunk> {
-        self.chunks
-            .iter()
-            .find(|chunk| chunk.position() == chunk_position)
+        self.chunks.get(&chunk_position)
     }
 
     pub(crate) fn get_voxel_type(&self, world_position: WorldPosition) -> VoxelType {
