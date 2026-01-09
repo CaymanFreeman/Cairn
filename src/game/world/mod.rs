@@ -4,15 +4,15 @@ mod position;
 pub(crate) use position::*;
 
 use crate::game::chunk::Chunk;
-use crate::game::mesh::OccludingVoxelNeighbors;
+use crate::game::mesh::{Mesh, OccludingVoxelNeighbors};
 use crate::game::render::TextureAtlas;
 use crate::game::voxel::{VoxelRegistry, VoxelType};
 use rayon::iter::IntoParallelRefIterator as _;
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::PI;
 
-const RENDER_DISTANCE_XZ: i32 = 5;
-const RENDER_DISTANCE_Y: i32 = 2;
+const RENDER_DISTANCE_XZ: i32 = 6;
+const RENDER_DISTANCE_Y: i32 = 3;
 const CHUNK_RENDER_MAXIMUM: usize =
     (PI * RENDER_DISTANCE_XZ.pow(2) as f32 * (2 * RENDER_DISTANCE_Y + 1) as f32).ceil() as usize;
 
@@ -20,7 +20,8 @@ pub(crate) struct World {
     voxel_registry: VoxelRegistry,
     texture_atlas: TextureAtlas,
     last_update_position: Option<ChunkPosition>,
-    chunks: HashMap<ChunkPosition, Chunk>,
+    chunk_data: HashMap<ChunkPosition, Chunk>,
+    chunk_meshes: HashMap<ChunkPosition, Mesh>,
 }
 
 impl World {
@@ -31,7 +32,8 @@ impl World {
             voxel_registry,
             texture_atlas,
             last_update_position: None,
-            chunks: HashMap::new(),
+            chunk_data: HashMap::new(),
+            chunk_meshes: HashMap::new(),
         }
     }
 
@@ -81,15 +83,15 @@ impl World {
 
     fn load_in_range_chunks(&mut self, chunks_in_range: &[ChunkPosition]) {
         for chunk_position in chunks_in_range {
-            if !self.chunks.contains_key(chunk_position) {
-                self.chunks
+            if !self.chunk_data.contains_key(chunk_position) {
+                self.chunk_data
                     .insert(*chunk_position, Chunk::dev_chunk(*chunk_position));
             }
         }
     }
 
     fn unload_out_of_range_chunks(&mut self, chunks_in_range: &HashSet<ChunkPosition>) {
-        self.chunks
+        self.chunk_data
             .retain(|pos, _chunk| chunks_in_range.contains(pos));
     }
 
@@ -101,24 +103,27 @@ impl World {
         &self.texture_atlas
     }
 
-    pub(crate) fn chunks(&self) -> &HashMap<ChunkPosition, Chunk> {
-        &self.chunks
+    pub(crate) fn chunk_data(&self) -> &HashMap<ChunkPosition, Chunk> {
+        &self.chunk_data
+    }
+
+    pub(crate) fn chunk_meshes(&self) -> &HashMap<ChunkPosition, Mesh> {
+        &self.chunk_meshes
+    }
+
+    pub(crate) fn insert_chunk_mesh(&mut self, chunk_position: &ChunkPosition, chunk_mesh: Mesh) {
+        self.chunk_meshes.insert(*chunk_position, chunk_mesh);
     }
 
     pub(crate) fn last_update_position(&self) -> Option<ChunkPosition> {
         self.last_update_position
     }
 
-    fn get_chunk(&self, chunk_position: ChunkPosition) -> Option<&Chunk> {
-        self.chunks.get(&chunk_position)
-    }
-
     pub(crate) fn get_voxel_type(&self, world_position: WorldPosition) -> VoxelType {
         let (chunk_position, local_chunk_position) = world_position.local_chunk_position();
-        if let Some(chunk) = self.get_chunk(chunk_position) {
-            chunk.get_voxel_type(local_chunk_position)
-        } else {
-            VoxelType::Air
+        match self.chunk_data.get(&chunk_position) {
+            Some(chunk) => chunk.get_voxel_type(local_chunk_position),
+            None => VoxelType::Air,
         }
     }
 

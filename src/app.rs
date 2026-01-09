@@ -115,11 +115,11 @@ impl ApplicationHandler for App {
                 .expect("Window should be created"),
         );
 
-        let renderer = match pollster::block_on(Renderer::new(window, &world)) {
+        let renderer = match pollster::block_on(Renderer::new(window, &mut world)) {
             Ok(mut renderer) => {
                 let chunk_position = renderer.camera().position().chunk_position();
                 world.update_chunks(chunk_position);
-                renderer.update_mesh(&world);
+                renderer.update_mesh(&mut world);
                 renderer
             }
             Err(error) => {

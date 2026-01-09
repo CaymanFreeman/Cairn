@@ -12,7 +12,7 @@ pub(crate) struct Chunk {
 }
 
 impl Chunk {
-    fn empty(position: ChunkPosition) -> Self {
+    pub(crate) fn empty(position: ChunkPosition) -> Self {
         Self {
             position,
             voxels: vec![VoxelType::Air.into(); CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE],

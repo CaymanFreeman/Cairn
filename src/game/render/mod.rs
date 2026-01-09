@@ -35,7 +35,7 @@ pub(crate) struct Renderer {
 }
 
 impl Renderer {
-    pub(crate) async fn new(window: Arc<Window>, world: &World) -> anyhow::Result<Self> {
+    pub(crate) async fn new(window: Arc<Window>, world: &mut World) -> anyhow::Result<Self> {
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
             ..Default::default()
@@ -119,7 +119,7 @@ impl Renderer {
         &mut self.camera_controller
     }
 
-    pub(crate) fn update_mesh(&mut self, world: &World) {
+    pub(crate) fn update_mesh(&mut self, world: &mut World) {
         let world_mesh = Mesh::world(world);
         self.vertex_buffer = create_vertex_buffer(&self.device, world_mesh.vertices_u8());
         self.index_buffer = create_index_buffer(&self.device, world_mesh.indices_u8());

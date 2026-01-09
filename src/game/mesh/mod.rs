@@ -3,11 +3,12 @@ mod vertex;
 pub(crate) use vertex::*;
 
 use crate::game::chunk::{Chunk, CHUNK_SIZE};
-
 use crate::game::render::TextureAtlas;
 use crate::game::voxel::{VoxelProperties, VoxelRegistry};
-use crate::game::world::{LocalChunkPosition, World, WorldPosition};
+use crate::game::world::{ChunkPosition, LocalChunkPosition, World, WorldPosition};
+use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
+#[derive(Clone)]
 pub(crate) struct Mesh {
     vertices: Vec<Vertex>,
     indices: Vec<u32>,
@@ -147,15 +148,50 @@ impl Mesh {
         Self::merged(voxel_meshes)
     }
 
-    pub(crate) fn world(world: &World) -> Self {
+    pub(crate) fn world(world: &mut World) -> Self {
         let voxel_registry = world.voxel_registry();
         let texture_atlas = world.texture_atlas();
-        let chunk_meshes = world
-            .chunks()
-            .values()
-            .map(|chunk| Self::chunk(world, chunk, voxel_registry, texture_atlas))
+
+        let chunk_positions = world
+            .chunk_data()
+            .keys()
+            .copied()
+            .collect::<Vec<ChunkPosition>>();
+
+        let uncached_chunks = chunk_positions
+            .iter()
+            .filter(|chunk_position| world.chunk_meshes().get(chunk_position).is_none())
+            .copied()
+            .collect::<Vec<ChunkPosition>>();
+
+        let new_chunk_meshes = uncached_chunks
+            .into_par_iter()
+            .map(|chunk_position| {
+                let chunk = match world.chunk_data().get(&chunk_position) {
+                    Some(chunk) => chunk,
+                    None => &Chunk::empty(chunk_position),
+                };
+                let chunk_mesh = Self::chunk(world, chunk, voxel_registry, texture_atlas);
+                (chunk_position, chunk_mesh)
+            })
+            .collect::<Vec<(ChunkPosition, Self)>>();
+
+        for (chunk_position, chunk_mesh) in &new_chunk_meshes {
+            world.insert_chunk_mesh(chunk_position, chunk_mesh.clone());
+        }
+
+        let all_chunk_meshes = chunk_positions
+            .into_iter()
+            .map(|chunk_position| {
+                world
+                    .chunk_meshes()
+                    .get(&chunk_position)
+                    .expect("Should have generated or cached each chunk mesh")
+                    .clone()
+            })
             .collect();
-        Self::merged(chunk_meshes)
+
+        Self::merged(all_chunk_meshes)
     }
 
     pub(crate) fn vertices(&self) -> &Vec<Vertex> {
