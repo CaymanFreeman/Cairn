@@ -24,35 +24,19 @@ impl WorldPosition {
         );
         ChunkPosition::new(x, y, z)
     }
-}
 
-#[derive(Copy, Clone, Hash, Eq, PartialEq)]
-pub(crate) struct ChunkPosition {
-    x: i32,
-    y: i32,
-    z: i32,
-}
-
-impl ChunkPosition {
-    pub(crate) fn new(x: i32, y: i32, z: i32) -> Self {
-        Self { x, y, z }
-    }
-
-    pub(crate) fn get(&self) -> (i32, i32, i32) {
-        (self.x, self.y, self.z)
-    }
-}
-
-#[derive(Copy, Clone)]
-pub(crate) struct LocalChunkPosition {
-    x: usize,
-    y: usize,
-    z: usize,
-}
-
-impl LocalChunkPosition {
-    pub(crate) fn new(x: usize, y: usize, z: usize) -> Self {
-        Self { x, y, z }
+    pub(crate) fn local_chunk_position(&self) -> (ChunkPosition, LocalChunkPosition) {
+        let chunk_position = self.chunk_position();
+        let (chunk_x, chunk_y, chunk_z) = chunk_position.get();
+        let (x, y, z) = (
+            self.x - chunk_x * CHUNK_SIZE as i32,
+            self.y - chunk_y * CHUNK_SIZE as i32,
+            self.z - chunk_z * CHUNK_SIZE as i32,
+        );
+        (
+            chunk_position,
+            LocalChunkPosition::new(x as usize, y as usize, z as usize),
+        )
     }
 
     pub(crate) fn front(&self) -> Self {
@@ -101,6 +85,36 @@ impl LocalChunkPosition {
             y: self.y - 1,
             z: self.z,
         }
+    }
+}
+
+#[derive(Copy, Clone, Hash, Eq, PartialEq)]
+pub(crate) struct ChunkPosition {
+    x: i32,
+    y: i32,
+    z: i32,
+}
+
+impl ChunkPosition {
+    pub(crate) fn new(x: i32, y: i32, z: i32) -> Self {
+        Self { x, y, z }
+    }
+
+    pub(crate) fn get(&self) -> (i32, i32, i32) {
+        (self.x, self.y, self.z)
+    }
+}
+
+#[derive(Copy, Clone)]
+pub(crate) struct LocalChunkPosition {
+    x: usize,
+    y: usize,
+    z: usize,
+}
+
+impl LocalChunkPosition {
+    pub(crate) fn new(x: usize, y: usize, z: usize) -> Self {
+        Self { x, y, z }
     }
 
     pub(crate) fn get(&self) -> (usize, usize, usize) {

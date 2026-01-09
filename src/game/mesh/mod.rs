@@ -116,6 +116,7 @@ impl Mesh {
     }
 
     pub(crate) fn chunk(
+        world: &World,
         chunk: &Chunk,
         voxel_registry: &VoxelRegistry,
         texture_atlas: &TextureAtlas,
@@ -132,8 +133,7 @@ impl Mesh {
                     if voxel_properties.is_invisible() {
                         continue;
                     }
-                    let occluding_neighbors =
-                        chunk.get_occluding_neighbors(local_position, voxel_registry);
+                    let occluding_neighbors = world.get_occluding_neighbors(world_position);
                     voxel_meshes.push(Self::voxel(
                         world_position,
                         voxel_properties,
@@ -153,7 +153,7 @@ impl Mesh {
         let chunk_meshes = world
             .chunks()
             .iter()
-            .map(|chunk| Self::chunk(chunk, voxel_registry, texture_atlas))
+            .map(|chunk| Self::chunk(world, chunk, voxel_registry, texture_atlas))
             .collect();
         Self::merged(chunk_meshes)
     }

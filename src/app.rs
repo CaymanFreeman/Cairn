@@ -6,7 +6,7 @@ use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, DeviceId, ElementState, KeyEvent, WindowEvent};
 use winit::event_loop::ActiveEventLoop;
 use winit::keyboard::{KeyCode, PhysicalKey};
-use winit::window::{CursorGrabMode, Fullscreen, Icon, Window};
+use winit::window::{CursorGrabMode, Icon, Window};
 
 const WINDOW_ICON: &[u8] = include_bytes!("../assets/icon.png");
 

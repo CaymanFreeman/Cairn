@@ -1,8 +1,9 @@
 mod position;
 
 use crate::game::chunk::Chunk;
+use crate::game::mesh::OccludingVoxelNeighbors;
 use crate::game::render::TextureAtlas;
-use crate::game::voxel::VoxelRegistry;
+use crate::game::voxel::{VoxelRegistry, VoxelType};
 pub(crate) use position::*;
 use std::collections::HashSet;
 
@@ -80,5 +81,59 @@ impl World {
 
     pub(crate) fn last_update_position(&self) -> Option<ChunkPosition> {
         self.last_update_position
+    }
+
+    fn get_chunk(&self, chunk_position: ChunkPosition) -> Option<&Chunk> {
+        self.chunks
+            .iter()
+            .find(|chunk| chunk.position() == chunk_position)
+    }
+
+    pub(crate) fn get_voxel_type(&self, world_position: WorldPosition) -> VoxelType {
+        let (chunk_position, local_chunk_position) = world_position.local_chunk_position();
+        if let Some(chunk) = self.get_chunk(chunk_position) {
+            chunk.get_voxel_type(local_chunk_position)
+        } else {
+            VoxelType::Air
+        }
+    }
+
+    pub(crate) fn get_is_occluding(&self, world_position: WorldPosition) -> bool {
+        let voxel_type = self.get_voxel_type(world_position);
+        self.voxel_registry
+            .get_properties(&voxel_type)
+            .is_occluding()
+    }
+
+    pub(crate) fn get_occluding_neighbors(
+        &self,
+        world_position: WorldPosition,
+    ) -> OccludingVoxelNeighbors {
+        let front = {
+            let front_neighbor = world_position.front();
+            self.get_is_occluding(front_neighbor)
+        };
+        let back = {
+            let back_neighbor = world_position.back();
+            self.get_is_occluding(back_neighbor)
+        };
+        let right = {
+            let right_neighbor = world_position.right();
+            self.get_is_occluding(right_neighbor)
+        };
+        let left = {
+            let left_neighbor = world_position.left();
+            self.get_is_occluding(left_neighbor)
+        };
+        let top = {
+            let top_neighbor = world_position.top();
+            self.get_is_occluding(top_neighbor)
+        };
+        let bottom = {
+            let bottom_neighbor = world_position.bottom();
+            self.get_is_occluding(bottom_neighbor)
+        };
+
+        OccludingVoxelNeighbors::new(front, back, right, left, top, bottom)
     }
 }

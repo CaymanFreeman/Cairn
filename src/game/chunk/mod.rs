@@ -1,5 +1,4 @@
-use crate::game::mesh::OccludingVoxelNeighbors;
-use crate::game::voxel::{VoxelRegistry, VoxelType};
+use crate::game::voxel::VoxelType;
 use crate::game::world::{ChunkPosition, LocalChunkPosition};
 use log::warn;
 use std::ops::RangeInclusive;
@@ -36,39 +35,6 @@ impl Chunk {
 
     fn index(x: usize, y: usize, z: usize) -> usize {
         x + y * CHUNK_SIZE + z * CHUNK_SIZE * CHUNK_SIZE
-    }
-
-    pub(crate) fn get_occluding_neighbors(
-        &self,
-        local_position: LocalChunkPosition,
-        voxel_registry: &VoxelRegistry,
-    ) -> OccludingVoxelNeighbors {
-        let front = {
-            let front_neighbor = local_position.front();
-            self.get_is_occluding(front_neighbor, voxel_registry)
-        };
-        let back = {
-            let back_neighbor = local_position.back();
-            self.get_is_occluding(back_neighbor, voxel_registry)
-        };
-        let right = {
-            let right_neighbor = local_position.right();
-            self.get_is_occluding(right_neighbor, voxel_registry)
-        };
-        let left = {
-            let left_neighbor = local_position.left();
-            self.get_is_occluding(left_neighbor, voxel_registry)
-        };
-        let top = {
-            let top_neighbor = local_position.top();
-            self.get_is_occluding(top_neighbor, voxel_registry)
-        };
-        let bottom = {
-            let bottom_neighbor = local_position.bottom();
-            self.get_is_occluding(bottom_neighbor, voxel_registry)
-        };
-
-        OccludingVoxelNeighbors::new(front, back, right, left, top, bottom)
     }
 
     #[expect(clippy::indexing_slicing)]
@@ -111,14 +77,5 @@ impl Chunk {
 
         VoxelType::try_from(self.voxels[Self::index(x, y, z)])
             .expect("Chunks should not store invalid voxel types")
-    }
-
-    fn get_is_occluding(
-        &self,
-        local_position: LocalChunkPosition,
-        voxel_registry: &VoxelRegistry,
-    ) -> bool {
-        let voxel_type = self.get_voxel_type(local_position);
-        voxel_registry.get_properties(&voxel_type).is_occluding()
     }
 }
