@@ -19,13 +19,17 @@ impl Chunk {
         }
     }
 
-    pub(crate) fn dev_chunk(position: ChunkPosition) -> Self {
-        let mut chunk = Self::empty(position);
+    pub(crate) fn dev_chunk(chunk_position: ChunkPosition) -> Self {
+        let (_, chunk_y, _) = chunk_position.get();
+        let mut chunk = Self::empty(chunk_position);
 
-        chunk.set_y_slice(31, VoxelType::Grass);
-        chunk.set_y_range(27..=30, VoxelType::Dirt);
-        chunk.set_y_range(0..=26, VoxelType::Stone);
-
+        if chunk_y != 0 {
+            return chunk;
+        } else {
+            chunk.set_y_slice(31, VoxelType::Grass);
+            chunk.set_y_range(27..=30, VoxelType::Dirt);
+            chunk.set_y_range(0..=26, VoxelType::Stone);
+        }
         chunk
     }
 
