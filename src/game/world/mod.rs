@@ -1,3 +1,4 @@
+use rayon::iter::ParallelIterator;
 mod position;
 
 pub(crate) use position::*;
@@ -6,6 +7,7 @@ use crate::game::chunk::Chunk;
 use crate::game::mesh::OccludingVoxelNeighbors;
 use crate::game::render::TextureAtlas;
 use crate::game::voxel::{VoxelRegistry, VoxelType};
+use rayon::iter::IntoParallelRefIterator as _;
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::PI;
 
@@ -38,7 +40,7 @@ impl World {
 
         let chunks_in_range_vec = Self::determine_chunks_in_range(origin_chunk_position);
         let chunks_in_range_set = chunks_in_range_vec
-            .iter()
+            .par_iter()
             .copied()
             .collect::<HashSet<ChunkPosition>>();
         self.unload_out_of_range_chunks(&chunks_in_range_set);
